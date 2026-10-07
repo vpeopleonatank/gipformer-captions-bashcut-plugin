@@ -1,0 +1,9 @@
+bin/provider links these libraries statically (from the sherpa-onnx v1.13.8 osx-arm64 static-lib release):
+
+- sherpa-onnx, kaldi-native-fbank, kaldi-decoder, kaldifst, OpenFst, ssentencepiece: Apache-2.0 (sherpa-onnx-LICENSE.txt)
+- ONNX Runtime: MIT (onnxruntime-LICENSE.txt)
+- kissfft: BSD-3-Clause
+- piper-phonemize: MIT
+- espeak-ng: GPL-3.0-or-later (https://github.com/espeak-ng/espeak-ng). It comes in with sherpa-onnx's text-to-speech
+  code, which this plugin never calls; the speech recognizer does not use it.
+- ucd (Unicode character data): see https://github.com/espeak-ng/espeak-ng

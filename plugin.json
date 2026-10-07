@@ -1,0 +1,98 @@
+{
+  "schema": "bashcut.plugin/1",
+  "id": "bashcut.gipformer-captions",
+  "name": {
+    "en": "Gipformer Captions",
+    "vi": "Phụ đề Gipformer"
+  },
+  "version": "0.0.1",
+  "apiVersion": 7,
+  "minApiVersion": 3,
+  "entrypoint": "bin/provider",
+  "transport": "session",
+  "category": "captions",
+  "capabilities": [
+    "captions.transcribe"
+  ],
+  "providers": [
+    {
+      "id": "bashcut.gipformer-captions.local",
+      "capability": "captions.transcribe",
+      "name": "Gipformer 1.5 (local, Vietnamese)",
+      "priority": 5
+    }
+  ],
+  "dependencies": [
+    {
+      "id": "gipformer",
+      "name": "Gipformer 1.5 (Vietnamese speech model)",
+      "kind": "model",
+      "probe": {
+        "executable": "bin/check",
+        "arguments": []
+      },
+      "install": {
+        "summary": "Download the Gipformer 1.5 int8 model (about 73 MB) and the Silero voice detection model (under 1 MB). Nothing else is installed.",
+        "command": {
+          "executable": "bin/setup",
+          "arguments": []
+        }
+      },
+      "estimatedBytes": 80000000
+    }
+  ],
+  "options": [
+    {
+      "id": "vocabulary",
+      "title": {
+        "en": "Names and words",
+        "vi": "Tên riêng và từ ngữ"
+      },
+      "type": "string",
+      "default": "",
+      "scope": "project",
+      "maxLength": 500,
+      "help": {
+        "en": "Places, people and terms in this video, comma separated (for example: Buôn Đôn, Buôn Ma Thuột). They are spelled right more often.",
+        "vi": "Địa danh, tên người, thuật ngữ trong video, cách nhau bằng dấu phẩy (ví dụ: Buôn Đôn, Buôn Ma Thuột). Giúp viết đúng chính tả hơn."
+      }
+    },
+    {
+      "id": "maxCharacters",
+      "title": {
+        "en": "Characters per caption",
+        "vi": "Số ký tự mỗi dòng phụ đề"
+      },
+      "type": "integer",
+      "minimum": 16,
+      "maximum": 84,
+      "default": 42,
+      "scope": "user",
+      "help": {
+        "en": "Longer sentences are split into captions of at most this many characters",
+        "vi": "Câu dài được tách thành các phụ đề không quá số ký tự này"
+      }
+    },
+    {
+      "id": "voiceDetection",
+      "title": {
+        "en": "Skip silence and music",
+        "vi": "Bỏ qua đoạn im lặng và nhạc"
+      },
+      "type": "bool",
+      "default": true,
+      "scope": "project",
+      "help": {
+        "en": "On: only stretches with speech are transcribed. Turn off when constant background noise makes captions miss speech.",
+        "vi": "Bật: chỉ phiên âm các đoạn có tiếng nói. Tắt khi tiếng ồn nền liên tục làm phụ đề bỏ sót lời nói."
+      }
+    }
+  ],
+  "contributes": {
+    "skills": [
+      {
+        "path": "skills/gipformer-captions"
+      }
+    ]
+  }
+}

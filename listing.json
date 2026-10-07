@@ -1,0 +1,18 @@
+{
+  "name": {
+    "en": "Gipformer Captions",
+    "vi": "Phụ đề Gipformer"
+  },
+  "summary": {
+    "en": "Vietnamese captions on Apple Silicon, timed per word, using Gipformer 1.5 (G-Group AI Lab, MIT) through sherpa-onnx (Apache-2.0). Voice detection can be turned off for noisy audio. Installs a 73 MB model; no Python.",
+    "vi": "Phụ đề tiếng Việt trên Apple Silicon, có thời gian từng từ, dùng Gipformer 1.5 (G-Group AI Lab, MIT) qua sherpa-onnx (Apache-2.0). Có thể tắt nhận diện giọng nói khi âm thanh nhiều tạp âm. Cài mô hình 73 MB, không cần Python."
+  },
+  "publisher": "bashcut",
+  "category": "captions",
+  "homepage": "https://github.com/dongnguyenvie/bashcut-plugins/tree/main/plugins/gipformer-captions",
+  "minAppVersion": "0.0.1",
+  "platforms": [
+    "macos-arm64"
+  ],
+  "downloadBytes": 80000000
+}

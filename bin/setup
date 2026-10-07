@@ -1,0 +1,43 @@
+#!/bin/sh
+# Install recipe for Gipformer Captions: downloads the Gipformer 1.5 int8 model and the Silero VAD model with curl and
+# checks every file against a pinned SHA-256. BashCut runs it after the user approves; running it again repairs an install.
+#   BASHCUT_PLUGIN_CACHE — can be downloaded again: the models
+# Keep the file table (name, bytes, SHA-256) identical to bin/check.
+set -eu
+cache="${BASHCUT_PLUGIN_CACHE:-$HOME/Library/Caches/BashCut/PluginData/bashcut.gipformer-captions}"
+models="$cache/models"
+hf="https://huggingface.co/g-group-ai-lab/gipformer1.5-68M-rnnt/resolve/dd9227dcd8705c13f33bdbe59728d546ab94480f"
+vad="https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/silero_vad.onnx"
+
+if [ "$(uname -m)" != "arm64" ]; then
+    echo "Gipformer Captions needs a Mac with Apple Silicon." >&2
+    exit 1
+fi
+mkdir -p "$models"
+
+# name|sha256|url|progress after it
+files="encoder.int8.onnx|b528768939c7711a889be81a718ea7f2ee50d0d2d384d53f399e15b44bd9408c|$hf/encoder.int8.onnx|0.85
+decoder.int8.onnx|e0a156b5454722a524230f9e35d5d928cfcdd3723437b418e5bd5e04f1c3a101|$hf/decoder.int8.onnx|0.90
+joiner.int8.onnx|12636559d135315f002a1e1b477077d415e888477378db0fd450aee5b21ac551|$hf/joiner.int8.onnx|0.95
+tokens.txt|f536d03c2e95ebd2930cf0abec88e823bd17d3c1933da7ae6a82db3b80605e15|$hf/tokens.txt|0.96
+bpe.model|289dbb44527c13c419ae3a4d8ce6a349f01a97f8777e69934a77e3692d2f10db|$hf/bpe.model|0.98
+silero_vad.onnx|9e2449e1087496d8d4caba907f23e0bd3f78d91fa552479bb9c23ac09cbb1fd6|$vad|0.99"
+
+echo "::progress 0.02 Checking the Gipformer files"
+echo "$files" | while IFS='|' read -r name sha url progress; do
+    file="$models/$name"
+    if [ -f "$file" ] && [ "$(shasum -a 256 "$file" | cut -d' ' -f1)" = "$sha" ]; then
+        echo "::progress $progress $name is already here"
+        continue
+    fi
+    echo "Downloading $name"
+    curl --fail --location --silent --show-error "$url" -o "$file.part"
+    if [ "$(shasum -a 256 "$file.part" | cut -d' ' -f1)" != "$sha" ]; then
+        rm -f "$file.part"
+        echo "$name does not match its expected checksum" >&2
+        exit 1
+    fi
+    mv "$file.part" "$file"
+    echo "::progress $progress $name downloaded"
+done
+echo "::progress 1.0 Gipformer is ready"

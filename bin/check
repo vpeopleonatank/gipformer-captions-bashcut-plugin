@@ -1,0 +1,14 @@
+#!/bin/sh
+# Dependency probe: every Gipformer model file is present with its expected size (setup checks the full hashes).
+# Keep the file table (name, bytes) identical to bin/setup.
+cache="${BASHCUT_PLUGIN_CACHE:-$HOME/Library/Caches/BashCut/PluginData/bashcut.gipformer-captions}"
+models="$cache/models"
+sizes="encoder.int8.onnx|70876359
+decoder.int8.onnx|1308690
+joiner.int8.onnx|1033417
+tokens.txt|25847
+bpe.model|270695
+silero_vad.onnx|643854"
+echo "$sizes" | while IFS='|' read -r name bytes; do
+    [ "$(stat -f %z "$models/$name" 2>/dev/null)" = "$bytes" ] || exit 1
+done
