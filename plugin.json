@@ -32,13 +32,13 @@
         "arguments": []
       },
       "install": {
-        "summary": "Download the Gipformer 1.5 int8 model (about 73 MB) and the Silero voice detection model (under 1 MB). Nothing else is installed.",
+        "summary": "Download the Gipformer 1.5 models (about 345 MB: the int8 model, 73 MB, and the fp32 model, 270 MB) and the Silero voice detection model (under 1 MB). Nothing else is installed.",
         "command": {
           "executable": "bin/setup",
           "arguments": []
         }
       },
-      "estimatedBytes": 80000000
+      "estimatedBytes": 350000000
     }
   ],
   "options": [
@@ -85,6 +85,34 @@
       "help": {
         "en": "On: only stretches with speech are transcribed. Turn off when constant background noise makes captions miss speech.",
         "vi": "Bật: chỉ phiên âm các đoạn có tiếng nói. Tắt khi tiếng ồn nền liên tục làm phụ đề bỏ sót lời nói."
+      }
+    },
+    {
+      "id": "precision",
+      "title": {
+        "en": "Model",
+        "vi": "Mô hình"
+      },
+      "type": "enum",
+      "choices": [
+        "int8",
+        "fp32"
+      ],
+      "choiceLabels": {
+        "int8": {
+          "en": "Standard (int8, faster)",
+          "vi": "Tiêu chuẩn (int8, nhanh hơn)"
+        },
+        "fp32": {
+          "en": "Full precision (fp32, better for singing and hard audio)",
+          "vi": "Độ chính xác đầy đủ (fp32, tốt hơn với tiếng hát và âm thanh khó)"
+        }
+      },
+      "default": "int8",
+      "scope": "project",
+      "help": {
+        "en": "Full precision is about a third slower and gets a few more words right in songs and difficult recordings.",
+        "vi": "Độ chính xác đầy đủ chậm hơn khoảng một phần ba và nhận đúng thêm một số từ trong bài hát và bản ghi khó."
       }
     }
   ],

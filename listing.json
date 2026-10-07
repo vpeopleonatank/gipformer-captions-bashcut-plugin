@@ -4,8 +4,8 @@
     "vi": "Phụ đề Gipformer"
   },
   "summary": {
-    "en": "Vietnamese captions on Apple Silicon, timed per word, using Gipformer 1.5 (G-Group AI Lab, MIT) through sherpa-onnx (Apache-2.0). Voice detection can be turned off for noisy audio. Installs a 73 MB model; no Python.",
-    "vi": "Phụ đề tiếng Việt trên Apple Silicon, có thời gian từng từ, dùng Gipformer 1.5 (G-Group AI Lab, MIT) qua sherpa-onnx (Apache-2.0). Có thể tắt nhận diện giọng nói khi âm thanh nhiều tạp âm. Cài mô hình 73 MB, không cần Python."
+    "en": "Vietnamese captions on Apple Silicon, timed per word, using Gipformer 1.5 (G-Group AI Lab, MIT) through sherpa-onnx (Apache-2.0). Voice detection can be turned off for noisy audio. Installs about 345 MB of models (int8 and full precision); no Python.",
+    "vi": "Phụ đề tiếng Việt trên Apple Silicon, có thời gian từng từ, dùng Gipformer 1.5 (G-Group AI Lab, MIT) qua sherpa-onnx (Apache-2.0). Có thể tắt nhận diện giọng nói khi âm thanh nhiều tạp âm. Cài khoảng 345 MB mô hình (int8 và độ chính xác đầy đủ), không cần Python."
   },
   "publisher": "bashcut",
   "category": "captions",
@@ -14,5 +14,5 @@
   "platforms": [
     "macos-arm64"
   ],
-  "downloadBytes": 80000000
+  "downloadBytes": 350000000
 }

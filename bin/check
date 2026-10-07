@@ -6,6 +6,9 @@ models="$cache/models"
 sizes="encoder.int8.onnx|70876359
 decoder.int8.onnx|1308690
 joiner.int8.onnx|1033417
+encoder.onnx|261057847
+decoder.onnx|5165084
+joiner.onnx|4104465
 tokens.txt|25847
 bpe.model|270695
 silero_vad.onnx|643854"

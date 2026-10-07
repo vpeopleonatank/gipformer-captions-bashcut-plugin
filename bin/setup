@@ -1,5 +1,5 @@
 #!/bin/sh
-# Install recipe for Gipformer Captions: downloads the Gipformer 1.5 int8 model and the Silero VAD model with curl and
+# Install recipe for Gipformer Captions: downloads the Gipformer 1.5 int8 and fp32 models and the Silero VAD model with curl and
 # checks every file against a pinned SHA-256. BashCut runs it after the user approves; running it again repairs an install.
 #   BASHCUT_PLUGIN_CACHE — can be downloaded again: the models
 # Keep the file table (name, bytes, SHA-256) identical to bin/check.
@@ -16,10 +16,13 @@ fi
 mkdir -p "$models"
 
 # name|sha256|url|progress after it
-files="encoder.int8.onnx|b528768939c7711a889be81a718ea7f2ee50d0d2d384d53f399e15b44bd9408c|$hf/encoder.int8.onnx|0.85
-decoder.int8.onnx|e0a156b5454722a524230f9e35d5d928cfcdd3723437b418e5bd5e04f1c3a101|$hf/decoder.int8.onnx|0.90
-joiner.int8.onnx|12636559d135315f002a1e1b477077d415e888477378db0fd450aee5b21ac551|$hf/joiner.int8.onnx|0.95
-tokens.txt|f536d03c2e95ebd2930cf0abec88e823bd17d3c1933da7ae6a82db3b80605e15|$hf/tokens.txt|0.96
+files="encoder.int8.onnx|b528768939c7711a889be81a718ea7f2ee50d0d2d384d53f399e15b44bd9408c|$hf/encoder.int8.onnx|0.22
+decoder.int8.onnx|e0a156b5454722a524230f9e35d5d928cfcdd3723437b418e5bd5e04f1c3a101|$hf/decoder.int8.onnx|0.23
+joiner.int8.onnx|12636559d135315f002a1e1b477077d415e888477378db0fd450aee5b21ac551|$hf/joiner.int8.onnx|0.24
+encoder.onnx|96b3c83c9c39afc4421f8fd2914d26b53ae837e56788a7bd5aece61580937c36|$hf/encoder.onnx|0.93
+decoder.onnx|ea584ee86d6f74191f934f8b950013adcb2c33483785aa8b1b44fff3a7b30069|$hf/decoder.onnx|0.95
+joiner.onnx|d146a1cff4a0060d7031e5eb91295773661bc52c356c952dd1e2759e60ffa94d|$hf/joiner.onnx|0.96
+tokens.txt|f536d03c2e95ebd2930cf0abec88e823bd17d3c1933da7ae6a82db3b80605e15|$hf/tokens.txt|0.97
 bpe.model|289dbb44527c13c419ae3a4d8ce6a349f01a97f8777e69934a77e3692d2f10db|$hf/bpe.model|0.98
 silero_vad.onnx|9e2449e1087496d8d4caba907f23e0bd3f78d91fa552479bb9c23ac09cbb1fd6|$vad|0.99"
 

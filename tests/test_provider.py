@@ -246,6 +246,14 @@ class CaptionTests(unittest.TestCase):
         message = next(line["message"] for line in lines if "speech segments" in line.get("message", ""))
         self.assertIn("2 speech segments [0.00-7.00,8.00-12.00]", message)
 
+    def test_precision_defaults_to_int8(self):
+        lines, _ = self.succeed()
+        self.assertIn("Using the int8 model", [line.get("message") for line in lines])
+        lines, _ = self.succeed(options={"precision": "fp32"})
+        self.assertIn("Using the fp32 model", [line.get("message") for line in lines])
+        lines, _ = self.succeed(options={"precision": "fp16"})
+        self.assertIn("Using the int8 model", [line.get("message") for line in lines])
+
     def test_windows_are_cut_at_the_quietest_point(self):
         lines, _ = self.succeed(media=self.long, options={"voiceDetection": False})
         message = next(line["message"] for line in lines if "cuts at" in line.get("message", ""))

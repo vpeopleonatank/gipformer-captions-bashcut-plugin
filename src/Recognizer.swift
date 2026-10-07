@@ -11,8 +11,8 @@ struct Paths {
     let models: String
     let resources: String
 
-    static let modelFiles = ["encoder.int8.onnx", "decoder.int8.onnx", "joiner.int8.onnx", "tokens.txt", "bpe.model",
-                             "silero_vad.onnx"]
+    static let modelFiles = ["encoder.int8.onnx", "decoder.int8.onnx", "joiner.int8.onnx", "encoder.onnx", "decoder.onnx",
+                             "joiner.onnx", "tokens.txt", "bpe.model", "silero_vad.onnx"]
 
     static var current: Paths {
         let env = ProcessInfo.processInfo.environment
@@ -32,17 +32,26 @@ struct Paths {
     }
 }
 
+/// Which model files to use: int8 (quantized, faster) or fp32 (full precision, a little more accurate on hard audio
+/// such as singing).
+enum Precision: String {
+    case int8
+    case fp32
+
+    var suffix: String { self == .int8 ? ".int8.onnx" : ".onnx" }
+}
+
 final class Recognizer {
     private let paths: Paths
-    private var greedy: OpaquePointer?
-    private var beam: OpaquePointer?
+    /// Recognizers by decoding method and precision, created on first use and kept for the session.
+    private var recognizers: [String: OpaquePointer] = [:]
 
     init(paths: Paths) { self.paths = paths }
 
-    private func make(method: String) -> OpaquePointer {
+    private func make(method: String, precision: Precision) -> OpaquePointer {
         let transducer = sherpaOnnxOfflineTransducerModelConfig(
-            encoder: paths.model("encoder.int8.onnx"), decoder: paths.model("decoder.int8.onnx"),
-            joiner: paths.model("joiner.int8.onnx"))
+            encoder: paths.model("encoder" + precision.suffix), decoder: paths.model("decoder" + precision.suffix),
+            joiner: paths.model("joiner" + precision.suffix))
         let model = sherpaOnnxOfflineModelConfig(
             tokens: paths.model("tokens.txt"), transducer: transducer,
             numThreads: min(4, ProcessInfo.processInfo.activeProcessorCount), modelType: "transducer",
@@ -58,18 +67,14 @@ final class Recognizer {
     }
 
     /// Decodes one segment. A vocabulary (uppercase entries) switches to beam search with those hotwords.
-    func decode(_ samples: [Float], vocabulary: [String]) -> Decoded {
-        let recognizer: OpaquePointer
-        let created: OpaquePointer?
-        if vocabulary.isEmpty {
-            if greedy == nil { greedy = make(method: "greedy_search") }
-            recognizer = greedy!
-            created = SherpaOnnxCreateOfflineStream(recognizer)
-        } else {
-            if beam == nil { beam = make(method: "modified_beam_search") }
-            recognizer = beam!
-            created = SherpaOnnxCreateOfflineStreamWithHotwords(recognizer, vocabulary.joined(separator: "/"))
-        }
+    func decode(_ samples: [Float], vocabulary: [String], precision: Precision) -> Decoded {
+        let method = vocabulary.isEmpty ? "greedy_search" : "modified_beam_search"
+        let key = method + "|" + precision.rawValue
+        let recognizer = recognizers[key] ?? make(method: method, precision: precision)
+        recognizers[key] = recognizer
+        let created = vocabulary.isEmpty
+            ? SherpaOnnxCreateOfflineStream(recognizer)
+            : SherpaOnnxCreateOfflineStreamWithHotwords(recognizer, vocabulary.joined(separator: "/"))
         guard let raw = created else { return Decoded(tokens: [], timestamps: []) }
         let stream = SherpaOnnxOfflineStreamWrapper(stream: raw)
         stream.acceptWaveform(samples: samples)

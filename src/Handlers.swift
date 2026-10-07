@@ -30,6 +30,7 @@ func handle(method: String, params: JSON, host: Host) throws -> Any? {
         .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }.filter { !$0.isEmpty }
     let maxCharacters = Int(number(options["maxCharacters"]) ?? 42)
     let voiceDetection = (options["voiceDetection"] as? NSNumber)?.boolValue ?? true
+    let precision = Precision(rawValue: options["precision"] as? String ?? "") ?? .int8
     let start = number(params["startSeconds"]) ?? 0
     let end = number(params["endSeconds"])
     if start < 0 || (end != nil && end! <= start) { throw PluginError("bad_range", "endSeconds must follow startSeconds") }
@@ -64,13 +65,15 @@ func handle(method: String, params: JSON, host: Host) throws -> Any? {
         host.progress(0.1, "\(segments.count) windows")
     }
 
+    host.progress(0.1, "Using the \(precision.rawValue) model")
     let total = max(segments.reduce(0) { $0 + $1.duration }, 0.001)
     var done = 0.0
     var spoken: [[Word]] = []
     for segment in segments {
         let decoded = fake
             ? fakeDecoded(duration: segment.duration)
-            : recognizer.decode(segment.samples, vocabulary: vocabulary.map { $0.uppercased(with: vietnamese) })
+            : recognizer.decode(segment.samples, vocabulary: vocabulary.map { $0.uppercased(with: vietnamese) },
+                                 precision: precision)
         let offset = start + segment.start
         var found = words(from: decoded, offset: offset, segmentEnd: offset + segment.duration)
         // Without voice detection a noise-only window can decode to a stray short word: drop it.
