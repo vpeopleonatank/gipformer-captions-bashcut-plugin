@@ -45,7 +45,14 @@ func fixedWindows(_ samples: [Float]) -> [AudioSegment] {
     }
 }
 
-/// Speech segments found by Silero VAD (up to 20 s each).
+/// Silero marks speech a little late and can drop quiet syllables, so each segment is widened by `speechPad` on both
+/// sides. Padded segments less than `mergeGap` apart are decoded together (up to `mergedLimit`), so a short pause never
+/// splits a sentence and the recognizer keeps the words around it in context.
+let speechPad = 1.0
+let mergeGap = 1.0
+let mergedLimit = 30.0
+
+/// Speech segments found by Silero VAD, padded and merged (up to `mergedLimit` each).
 func speechSegments(_ samples: [Float], vadModel: String) -> [AudioSegment] {
     var config = sherpaOnnxVadModelConfig(
         sileroVad: sherpaOnnxSileroVadModelConfig(
@@ -53,11 +60,12 @@ func speechSegments(_ samples: [Float], vadModel: String) -> [AudioSegment] {
             maxSpeechDuration: 20),
         sampleRate: 16000, numThreads: 1)
     let vad = SherpaOnnxVoiceActivityDetectorWrapper(config: &config, buffer_size_in_seconds: 60)
-    var found: [AudioSegment] = []
+    var found: [Range<Int>] = []
     func drain() {
         while !vad.isEmpty() {
             let segment = vad.front()
-            found.append(AudioSegment(start: Double(segment.start) / sampleRate, samples: segment.samples))
+            let start = Int(segment.start)
+            found.append(start..<(start + segment.samples.count))
             vad.pop()
         }
     }
@@ -69,5 +77,25 @@ func speechSegments(_ samples: [Float], vadModel: String) -> [AudioSegment] {
     }
     vad.flush()
     drain()
-    return found
+    return padded(found, count: samples.count).map {
+        AudioSegment(start: Double($0.lowerBound) / sampleRate, samples: Array(samples[$0]))
+    }
+}
+
+/// Widens each range by `speechPad`, clamped to the audio, and merges ranges less than `mergeGap` apart while the
+/// result stays within `mergedLimit`.
+func padded(_ ranges: [Range<Int>], count: Int) -> [Range<Int>] {
+    let pad = Int(speechPad * sampleRate), gap = Int(mergeGap * sampleRate), limit = Int(mergedLimit * sampleRate)
+    var merged: [Range<Int>] = []
+    for range in ranges.sorted(by: { $0.lowerBound < $1.lowerBound }) {
+        let wide = max(0, range.lowerBound - pad)..<min(count, range.upperBound + pad)
+        if let last = merged.last, wide.lowerBound - last.upperBound < gap,
+           max(last.upperBound, wide.upperBound) - last.lowerBound <= limit {
+            merged[merged.count - 1] = last.lowerBound..<max(last.upperBound, wide.upperBound)
+        } else {
+            // Never decode the same audio twice: an overlap left over by the length limit goes to the earlier segment.
+            merged.append(max(wide.lowerBound, merged.last?.upperBound ?? 0)..<wide.upperBound)
+        }
+    }
+    return merged.filter { !$0.isEmpty }
 }

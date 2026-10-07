@@ -239,6 +239,13 @@ class CaptionTests(unittest.TestCase):
         lines, _ = self.succeed(options={"voiceDetection": False})
         self.assertTrue(any("Voice detection off: 1 windows" in line.get("message", "") for line in lines))
 
+    def test_speech_segments_are_padded_and_merged(self):
+        # Fake detections 0.5–3, 3.4–6 and 9–11.5 s, padded by 1 s: the first two overlap and merge; the third starts
+        # exactly 1 s after, which is not less than the merge gap, so it stays apart.
+        lines, _ = self.succeed(options={"voiceDetection": True})
+        message = next(line["message"] for line in lines if "speech segments" in line.get("message", ""))
+        self.assertIn("2 speech segments [0.00-7.00,8.00-12.00]", message)
+
     def test_windows_are_cut_at_the_quietest_point(self):
         lines, _ = self.succeed(media=self.long, options={"voiceDetection": False})
         message = next(line["message"] for line in lines if "cuts at" in line.get("message", ""))

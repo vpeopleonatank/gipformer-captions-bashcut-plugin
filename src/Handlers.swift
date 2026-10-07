@@ -42,10 +42,14 @@ func handle(method: String, params: JSON, host: Host) throws -> Any? {
     let segments: [AudioSegment]
     if fake {
         if voiceDetection {
-            let half = samples.count / 2
-            segments = [AudioSegment(start: 0, samples: Array(samples[..<half])),
-                        AudioSegment(start: Double(half) / sampleRate, samples: Array(samples[half...]))]
-            host.progress(0.08, "Voice detection on: \(segments.count) speech segments")
+            // Fixed detections at 0.5–3, 3.4–6 and 9–11.5 s (clamped to the audio) go through the real padding.
+            let found = [(0.5, 3.0), (3.4, 6.0), (9.0, 11.5)].map { Int($0 * sampleRate)..<Int($1 * sampleRate) }
+                .map { min($0.lowerBound, samples.count)..<min($0.upperBound, samples.count) }.filter { !$0.isEmpty }
+            let ranges = padded(found, count: samples.count)
+            segments = ranges.map { AudioSegment(start: Double($0.lowerBound) / sampleRate, samples: Array(samples[$0])) }
+            let bounds = ranges.map { String(format: "%.2f-%.2f", Double($0.lowerBound) / sampleRate,
+                                             Double($0.upperBound) / sampleRate) }.joined(separator: ",")
+            host.progress(0.08, "Voice detection on: \(segments.count) speech segments [\(bounds)]")
         } else {
             segments = fixedWindows(samples)
             let cuts = windowCuts(samples).map { String(format: "%.2f", Double($0) / sampleRate) }.joined(separator: ",")
