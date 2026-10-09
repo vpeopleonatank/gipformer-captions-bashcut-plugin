@@ -246,6 +246,28 @@ class CaptionTests(unittest.TestCase):
         message = next(line["message"] for line in lines if "speech segments" in line.get("message", ""))
         self.assertIn("2 speech segments [0.00-7.00,8.00-12.00]", message)
 
+    def test_speech_left_without_words_is_decoded_again(self):
+        # Fake detections 14–20 and 20.4–26 s merge into 13–27 s, whose fake words end near 16.6 s: the second
+        # detection is decoded alone (19.4–27 s) and its words are added in order.
+        self.succeed(media=self.long, options={"voiceDetection": True})
+        starts = [w["start"] for w in self.words("long")]
+        self.assertEqual(starts, sorted(starts))
+        self.assertTrue(any(19.4 <= start < 27 for start in starts), starts)
+        self.assertFalse(any(16.7 < start < 19.4 for start in starts), starts)
+
+    def test_first_word_is_placed_before_the_second(self):
+        # The model stamps a segment's first token at 0; the first word starts 0.3 s before the second instead.
+        self.succeed(options={"voiceDetection": True})
+        words = self.words()
+        self.assertAlmostEqual(words[1]["start"] - words[0]["start"], 0.3, delta=0.001)
+
+    def test_voice_sensitivity_defaults_to_normal(self):
+        for options, expected in (({}, "normal"), ({"voiceSensitivity": "high"}, "high"),
+                                  ({"voiceSensitivity": "low"}, "low"), ({"voiceSensitivity": "max"}, "normal")):
+            lines, _ = self.succeed(options={"voiceDetection": True, **options})
+            message = next(line["message"] for line in lines if "speech segments" in line.get("message", ""))
+            self.assertIn(f"Voice detection on ({expected} sensitivity)", message, options)
+
     def test_precision_defaults_to_int8(self):
         lines, _ = self.succeed()
         self.assertIn("Using the int8 model", [line.get("message") for line in lines])

@@ -88,6 +88,39 @@
       }
     },
     {
+      "id": "voiceSensitivity",
+      "title": {
+        "en": "Voice detection sensitivity",
+        "vi": "Độ nhạy nhận giọng nói"
+      },
+      "type": "enum",
+      "choices": [
+        "low",
+        "normal",
+        "high"
+      ],
+      "choiceLabels": {
+        "low": {
+          "en": "Low (skips more noise, can miss quiet speech)",
+          "vi": "Thấp (bỏ qua nhiều tạp âm hơn, có thể sót lời nói nhỏ)"
+        },
+        "normal": {
+          "en": "Normal",
+          "vi": "Bình thường"
+        },
+        "high": {
+          "en": "High (catches quiet or distant voices)",
+          "vi": "Cao (bắt được giọng nói nhỏ hoặc ở xa)"
+        }
+      },
+      "default": "normal",
+      "scope": "project",
+      "help": {
+        "en": "Used when Skip silence and music is on. Raise it when quiet speech is missing; lower it when noise turns into stray words.",
+        "vi": "Dùng khi bật Bỏ qua đoạn im lặng và nhạc. Tăng lên khi phụ đề sót lời nói nhỏ; giảm xuống khi tạp âm thành chữ thừa."
+      }
+    },
+    {
       "id": "precision",
       "title": {
         "en": "Model",

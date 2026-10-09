@@ -4,6 +4,7 @@ import Foundation
 struct AudioSegment {
     let start: Double  // seconds from the start of the decoded audio
     let samples: [Float]
+    var speech: [Range<Int>] = []  // voice-detected speech inside, in samples of the decoded audio
     var duration: Double { Double(samples.count) / sampleRate }
 }
 
@@ -47,17 +48,27 @@ func fixedWindows(_ samples: [Float]) -> [AudioSegment] {
 
 /// Silero marks speech a little late and can drop quiet syllables, so each segment is widened by `speechPad` on both
 /// sides. Padded segments less than `mergeGap` apart are decoded together (up to `mergedLimit`), so a short pause never
-/// splits a sentence and the recognizer keeps the words around it in context.
+/// splits a sentence and the recognizer keeps the words around it in context. Each segment keeps the speech found in
+/// it (`speech`), so speech its decode left without words can be decoded again on its own.
 let speechPad = 1.0
 let mergeGap = 1.0
 let mergedLimit = 30.0
 
+/// How readily Silero calls a frame speech: `high` also catches quiet or distant voices, `low` skips more noise.
+enum Sensitivity: String {
+    case low
+    case normal
+    case high
+
+    var threshold: Float { [.low: 0.5, .normal: 0.3, .high: 0.2][self]! }
+}
+
 /// Speech segments found by Silero VAD, padded and merged (up to `mergedLimit` each).
-func speechSegments(_ samples: [Float], vadModel: String) -> [AudioSegment] {
+func speechSegments(_ samples: [Float], vadModel: String, sensitivity: Sensitivity) -> [AudioSegment] {
     var config = sherpaOnnxVadModelConfig(
         sileroVad: sherpaOnnxSileroVadModelConfig(
-            model: vadModel, threshold: 0.5, minSilenceDuration: 0.5, minSpeechDuration: 0.25, windowSize: 512,
-            maxSpeechDuration: 20),
+            model: vadModel, threshold: sensitivity.threshold, minSilenceDuration: 0.5, minSpeechDuration: 0.25,
+            windowSize: 512, maxSpeechDuration: 20),
         sampleRate: 16000, numThreads: 1)
     let vad = SherpaOnnxVoiceActivityDetectorWrapper(config: &config, buffer_size_in_seconds: 60)
     var found: [Range<Int>] = []
@@ -77,8 +88,14 @@ func speechSegments(_ samples: [Float], vadModel: String) -> [AudioSegment] {
     }
     vad.flush()
     drain()
-    return padded(found, count: samples.count).map {
-        AudioSegment(start: Double($0.lowerBound) / sampleRate, samples: Array(samples[$0]))
+    return detected(found, samples: samples)
+}
+
+/// Segments for detected speech ranges: padded and merged, each keeping the detections it holds.
+func detected(_ found: [Range<Int>], samples: [Float]) -> [AudioSegment] {
+    padded(found, count: samples.count).map { range in
+        AudioSegment(start: Double(range.lowerBound) / sampleRate, samples: Array(samples[range]),
+                     speech: found.filter { range.contains($0.lowerBound) })
     }
 }
 

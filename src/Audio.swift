@@ -1,4 +1,6 @@
-// Decodes the first audio track to 16 kHz mono floats with AVFoundation (any format macOS plays).
+// Decodes the first audio track to 16 kHz mono floats: AVFoundation decodes it (any format macOS plays) at its own rate
+// and sherpa-onnx's linear resampler converts it. AVFoundation's own sample rate conversion is not deterministic (the
+// same file gives a few samples more or less each time), which was enough to change what quiet speech decoded to.
 import AVFoundation
 import Foundation
 
@@ -19,8 +21,11 @@ func decodeAudio(_ path: String, start: Double, end: Double?) throws -> [Float] 
     guard last - start > 0.1 else { throw PluginError("bad_range", "The range is outside the audio") }
     reader.timeRange = CMTimeRange(
         start: CMTime(seconds: start, preferredTimescale: 48_000), end: CMTime(seconds: last, preferredTimescale: 48_000))
+    let native = track.formatDescriptions.lazy
+        .compactMap { CMAudioFormatDescriptionGetStreamBasicDescription($0 as! CMFormatDescription)?.pointee.mSampleRate }
+        .first { $0 > 0 } ?? sampleRate
     let output = AVAssetReaderTrackOutput(track: track, outputSettings: [
-        AVFormatIDKey: kAudioFormatLinearPCM, AVSampleRateKey: sampleRate, AVNumberOfChannelsKey: 1,
+        AVFormatIDKey: kAudioFormatLinearPCM, AVSampleRateKey: native, AVNumberOfChannelsKey: 1,
         AVLinearPCMBitDepthKey: 32, AVLinearPCMIsFloatKey: true, AVLinearPCMIsNonInterleaved: false,
         AVLinearPCMIsBigEndianKey: false,
     ])
@@ -41,6 +46,19 @@ func decodeAudio(_ path: String, start: Double, end: Double?) throws -> [Float] 
     if reader.status == .failed {
         throw PluginError("cannot_decode", "Cannot decode audio: \(reader.error?.localizedDescription ?? "unknown error")")
     }
+    if native != sampleRate { samples = resampled(samples, from: native) }
     guard samples.count >= Int(sampleRate / 10) else { throw PluginError("bad_range", "The range is outside the audio") }
     return samples
+}
+
+func resampled(_ samples: [Float], from rate: Double) -> [Float] {
+    guard let resampler = SherpaOnnxCreateLinearResampler(Int32(rate.rounded()), Int32(sampleRate), 0, 0) else {
+        return samples
+    }
+    defer { SherpaOnnxDestroyLinearResampler(resampler) }
+    guard let out = samples.withUnsafeBufferPointer({
+        SherpaOnnxLinearResamplerResample(resampler, $0.baseAddress, Int32($0.count), 1)
+    }) else { return [] }
+    defer { SherpaOnnxLinearResamplerResampleFree(out) }
+    return Array(UnsafeBufferPointer(start: out.pointee.samples, count: Int(out.pointee.n)))
 }

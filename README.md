@@ -7,7 +7,8 @@ against a pinned SHA-256.
 
 Options: `vocabulary` (names spelled as typed, uses beam search with hotwords), `maxCharacters`, and `voiceDetection`
 (on skips silence and music; off cuts the audio into windows of about 20 s at quiet points, for audio with constant
-background noise), and `precision` (`int8` by default; `fp32` is about a third slower and gets a few more words
+background noise), `voiceSensitivity` (`low`, `normal` by default, or `high`: the Silero speech threshold, 0.5, 0.3 or
+0.2), and `precision` (`int8` by default; `fp32` is about a third slower and gets a few more words
 right in songs and difficult recordings). The model outputs UPPERCASE text without punctuation, so captions are lowercased with a capital at
 each caption start.
 

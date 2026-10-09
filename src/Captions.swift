@@ -22,6 +22,9 @@ let minSeconds = 0.7
 // Token timestamps are starts only. A word is shown at most this long, so a pause after it stays a gap that
 // `phrases` can see.
 let maxWordSeconds = 0.5
+// The model stamps the first token of a segment at 0 wherever the speech starts, so the first word is placed this long
+// before the second.
+let firstWordSeconds = 0.3
 
 let vietnamese = Locale(identifier: "vi")
 
@@ -46,6 +49,7 @@ func words(from decoded: Decoded, offset: Double, segmentEnd: Double) -> [Word] 
         }
     }
     pieces = pieces.filter { !$0.text.isEmpty }
+    if pieces.count > 1 { pieces[0].start = max(pieces[0].start, pieces[1].start - firstWordSeconds) }
     return pieces.enumerated().map { index, piece in
         let next = index + 1 < pieces.count ? pieces[index + 1].start : segmentEnd
         let end = max(piece.start, min(next, piece.start + maxWordSeconds, segmentEnd))

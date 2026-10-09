@@ -26,6 +26,8 @@ getting the words right.
    makes captions miss speech:
    `bashcut plugins option bashcut.gipformer-captions --option voiceDetection --value false`. With it off, noise-only
    stretches are also decoded, so check for stray words.
+   `voiceSensitivity` (project scope, `low`, `normal` or `high`, default `normal`) sets how readily voice detection
+   hears speech: `high` catches quiet or distant voices, `low` skips more noise.
 4. `maxCharacters` (user scope, 16–84, default 42) splits long sentences; vertical video reads better around 32.
 
 ## Transcribe
@@ -39,7 +41,10 @@ getting the words right.
 
 - Read the captions with `bashcut timeline get --format text` and look for misspelled names. Add them to
   `vocabulary` and run again with `--replace`, rather than fixing many captions by hand.
-- If speech is missing, retry with `voiceDetection` off; if stray words appear in noise, turn it back on.
+- If quiet speech is missing, retry with `voiceSensitivity` `high`, then with `voiceDetection` off; if stray words
+  appear in noise, set `voiceSensitivity` to `low` or turn `voiceDetection` back on.
+- If an unclear stretch reads differently on every run (a name, a brand), ask the user what is said there and put it
+  in `vocabulary` instead of trying more options.
 - Look at one frame with `bashcut ui frame <frame>` to confirm the captions fit the safe area.
 
 ## When it fails

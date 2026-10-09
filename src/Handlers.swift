@@ -7,14 +7,34 @@ import Foundation
 let fake = ProcessInfo.processInfo.environment["GIPFORMER_FAKE"] == "1"
 let recognizer = Recognizer(paths: Paths.current)
 
-/// A fixed uppercase transcript spread over a segment, the way the model returns tokens.
+/// A fixed uppercase transcript spread over a segment, the way the model returns tokens: the first is stamped at 0.
 func fakeDecoded(duration: Double) -> Decoded {
     let tokens = [" XIN", " CHÀO", " CÁC", " BẠN", " HÔM", " NAY", " MÌNH", " ĐI", " BUÔN", " ĐÔN", " CHƠI"]
     let step = min(0.3, duration * 0.8 / Double(tokens.count))
-    return Decoded(tokens: tokens, timestamps: tokens.indices.map { Float(0.1 + Double($0) * step) })
+    return Decoded(tokens: tokens, timestamps: tokens.indices.map { $0 == 0 ? 0 : Float(0.1 + Double($0) * step) })
 }
 
 func number(_ value: Any?) -> Double? { (value as? NSNumber)?.doubleValue }
+
+/// Decoded together with louder speech, a quiet phrase after a pause can come out with no words at all, yet decodes
+/// fine on its own. Each detected stretch of `speech` (samples) that got no word is decoded alone, padded by
+/// `speechPad` within the segment, and its words that fall between the neighbouring words are added.
+func recovered(_ found: [Word], speech: [Range<Int>], within bounds: Range<Int>, mediaStart: Double,
+               transcribe: (Range<Int>) -> [Word]) -> [Word] {
+    var result = found
+    let pad = Int(speechPad * sampleRate)
+    for stretch in speech {
+        let from = mediaStart + Double(stretch.lowerBound) / sampleRate
+        let to = mediaStart + Double(stretch.upperBound) / sampleRate
+        guard !result.contains(where: { $0.start < to && $0.end > from }) else { continue }
+        let after = result.last(where: { $0.end <= from })?.end ?? -Double.infinity
+        let before = result.first(where: { $0.start >= to })?.start ?? Double.infinity
+        let window = max(bounds.lowerBound, stretch.lowerBound - pad)..<min(bounds.upperBound, stretch.upperBound + pad)
+        let extra = transcribe(window).filter { $0.start >= after && $0.end <= before }
+        result = (result + extra).sorted { $0.start < $1.start }
+    }
+    return result
+}
 
 func handle(method: String, params: JSON, host: Host) throws -> Any? {
     guard method == "captions.transcribe" else { throw PluginError("unknown_method", "Gipformer Captions does not handle \(method)") }
@@ -30,6 +50,7 @@ func handle(method: String, params: JSON, host: Host) throws -> Any? {
         .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }.filter { !$0.isEmpty }
     let maxCharacters = Int(number(options["maxCharacters"]) ?? 42)
     let voiceDetection = (options["voiceDetection"] as? NSNumber)?.boolValue ?? true
+    let sensitivity = Sensitivity(rawValue: options["voiceSensitivity"] as? String ?? "") ?? .normal
     let precision = Precision(rawValue: options["precision"] as? String ?? "") ?? .int8
     let start = number(params["startSeconds"]) ?? 0
     let end = number(params["endSeconds"])
@@ -43,22 +64,22 @@ func handle(method: String, params: JSON, host: Host) throws -> Any? {
     let segments: [AudioSegment]
     if fake {
         if voiceDetection {
-            // Fixed detections at 0.5–3, 3.4–6 and 9–11.5 s (clamped to the audio) go through the real padding.
-            let found = [(0.5, 3.0), (3.4, 6.0), (9.0, 11.5)].map { Int($0 * sampleRate)..<Int($1 * sampleRate) }
+            // Fixed detections at 0.5–3, 3.4–6, 9–11.5, 14–20 and 20.4–26 s (clamped to the audio) go through the real
+            // padding. The fake words of the 13–27 s segment end near 16.6 s, so 20.4–26 s is decoded again alone.
+            let found = [(0.5, 3.0), (3.4, 6.0), (9.0, 11.5), (14.0, 20.0), (20.4, 26.0)].map { Int($0 * sampleRate)..<Int($1 * sampleRate) }
                 .map { min($0.lowerBound, samples.count)..<min($0.upperBound, samples.count) }.filter { !$0.isEmpty }
-            let ranges = padded(found, count: samples.count)
-            segments = ranges.map { AudioSegment(start: Double($0.lowerBound) / sampleRate, samples: Array(samples[$0])) }
-            let bounds = ranges.map { String(format: "%.2f-%.2f", Double($0.lowerBound) / sampleRate,
-                                             Double($0.upperBound) / sampleRate) }.joined(separator: ",")
-            host.progress(0.08, "Voice detection on: \(segments.count) speech segments [\(bounds)]")
+            segments = detected(found, samples: samples)
+            let bounds = segments.map { String(format: "%.2f-%.2f", $0.start, $0.start + $0.duration) }
+                .joined(separator: ",")
+            host.progress(0.08, "Voice detection on (\(sensitivity.rawValue) sensitivity): \(segments.count) speech segments [\(bounds)]")
         } else {
             segments = fixedWindows(samples)
             let cuts = windowCuts(samples).map { String(format: "%.2f", Double($0) / sampleRate) }.joined(separator: ",")
             host.progress(0.08, "Voice detection off: \(segments.count) windows, cuts at [\(cuts)]")
         }
     } else if voiceDetection {
-        host.progress(0.05, "Finding speech")
-        segments = speechSegments(samples, vadModel: paths.model("silero_vad.onnx"))
+        host.progress(0.05, "Finding speech (\(sensitivity.rawValue) sensitivity)")
+        segments = speechSegments(samples, vadModel: paths.model("silero_vad.onnx"), sensitivity: sensitivity)
         host.progress(0.1, "\(segments.count) speech segments")
     } else {
         segments = fixedWindows(samples)
@@ -69,15 +90,22 @@ func handle(method: String, params: JSON, host: Host) throws -> Any? {
     let total = max(segments.reduce(0) { $0 + $1.duration }, 0.001)
     var done = 0.0
     var spoken: [[Word]] = []
-    for segment in segments {
+    func transcribe(_ range: Range<Int>) -> [Word] {
+        let duration = Double(range.count) / sampleRate
         let decoded = fake
-            ? fakeDecoded(duration: segment.duration)
-            : recognizer.decode(segment.samples, vocabulary: vocabulary.map { $0.uppercased(with: vietnamese) },
+            ? fakeDecoded(duration: duration)
+            : recognizer.decode(Array(samples[range]), vocabulary: vocabulary.map { $0.uppercased(with: vietnamese) },
                                  precision: precision)
-        let offset = start + segment.start
-        var found = words(from: decoded, offset: offset, segmentEnd: offset + segment.duration)
+        let offset = start + Double(range.lowerBound) / sampleRate
+        return words(from: decoded, offset: offset, segmentEnd: offset + duration)
+    }
+    for segment in segments {
+        let first = Int(segment.start * sampleRate)
+        let bounds = first..<(first + segment.samples.count)
+        var found = transcribe(bounds)
         // Without voice detection a noise-only window can decode to a stray short word: drop it.
         if !voiceDetection && found.count <= 1 && segment.duration < 0.3 { found = [] }
+        found = recovered(found, speech: segment.speech, within: bounds, mediaStart: start, transcribe: transcribe)
         if !found.isEmpty { spoken.append(restoreVocabulary(found, entries: vocabulary)) }
         done += segment.duration
         host.progress(0.1 + 0.85 * done / total, "Transcribing")
